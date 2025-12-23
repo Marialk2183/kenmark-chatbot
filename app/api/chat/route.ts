@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { generateAIResponse, ChatMessage } from "@/lib/ai";
 import { searchKnowledgeBase, logAnalytics } from "@/lib/knowledge";
-import { prisma } from "@/lib/prisma";
+import { safeDbOperation, getPrisma } from "@/lib/safe-prisma";
 
 export async function POST(request: NextRequest) {
   // Default fallback response
@@ -93,40 +93,46 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Save to database (completely non-blocking)
-    if (process.env.DATABASE_URL) {
+    // Save to database (completely non-blocking, never throws)
+    const prisma = getPrisma();
+    if (prisma) {
       try {
         // Ensure session exists and get its ID
-        const session = await prisma.chatSession.upsert({
-          where: { sessionId: sessionId || "default" },
-          update: { updatedAt: new Date() },
-          create: { sessionId: sessionId || "default" },
-        }).catch(() => null);
+        const session = await safeDbOperation(
+          async (p) => await p.chatSession.upsert({
+            where: { sessionId: sessionId || "default" },
+            update: { updatedAt: new Date() },
+            create: { sessionId: sessionId || "default" },
+          }),
+          null
+        );
 
         if (session) {
-          // Save user message
-          await prisma.chatMessage.create({
-            data: {
-              sessionId: sessionId || "default",
-              sessionRef: session.id,
-              role: "user",
-              content: message.substring(0, 5000), // Limit length
+          // Save messages (non-blocking)
+          await safeDbOperation(
+            async (p) => {
+              await p.chatMessage.create({
+                data: {
+                  sessionId: sessionId || "default",
+                  sessionRef: session.id,
+                  role: "user",
+                  content: message.substring(0, 5000),
+                },
+              });
+              await p.chatMessage.create({
+                data: {
+                  sessionId: sessionId || "default",
+                  sessionRef: session.id,
+                  role: "assistant",
+                  content: aiResponse.substring(0, 5000),
+                },
+              });
             },
-          }).catch(() => {});
-
-          // Save assistant message
-          await prisma.chatMessage.create({
-            data: {
-              sessionId: sessionId || "default",
-              sessionRef: session.id,
-              role: "assistant",
-              content: aiResponse.substring(0, 5000), // Limit length
-            },
-          }).catch(() => {});
+            undefined
+          );
         }
       } catch (dbError) {
-        console.error("Database error (non-critical):", dbError);
-        // Continue even if DB fails - this is completely optional
+        // Silently ignore - database is optional
       }
     }
 
