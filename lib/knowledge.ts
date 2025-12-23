@@ -1,4 +1,5 @@
 import { prisma } from "./prisma";
+import { safeDbOperation, getPrisma } from "./safe-prisma";
 import * as XLSX from "xlsx";
 
 export interface KnowledgeEntry {
@@ -24,15 +25,15 @@ export async function searchKnowledgeBase(query: string, limit: number = 5): Pro
     
     if (searchTerms.length === 0) {
       // If no search terms, return some general entries
-      const generalResults = await prisma.knowledgeBase.findMany({
-        take: limit,
-        orderBy: {
-          createdAt: "desc",
-        },
-      }).catch(() => {
-        // Return empty array if database query fails
-        return [];
-      });
+      const generalResults = await safeDbOperation(
+        async (p) => await p.knowledgeBase.findMany({
+          take: limit,
+          orderBy: {
+            createdAt: "desc",
+          },
+        }),
+        []
+      );
       
       return generalResults.map((entry) => ({
         id: entry.id.toString(),
@@ -84,11 +85,14 @@ export async function searchKnowledgeBase(query: string, limit: number = 5): Pro
 }
 
 export async function getAllKnowledge(): Promise<KnowledgeEntry[]> {
-  const results = await prisma.knowledgeBase.findMany({
-    orderBy: {
-      category: "asc",
-    },
-  });
+  const results = await safeDbOperation(
+    async (p) => await p.knowledgeBase.findMany({
+      orderBy: {
+        category: "asc",
+      },
+    }),
+    []
+  );
 
   return results.map((entry) => ({
     id: entry.id.toString(),
@@ -206,16 +210,11 @@ export async function saveKnowledgeEntries(entries: KnowledgeEntry[]): Promise<v
 }
 
 export async function logAnalytics(question: string): Promise<void> {
-  // Only log if database is available
-  if (!process.env.DATABASE_URL) {
-    return;
-  }
+  // Limit question length to prevent database errors
+  const truncatedQuestion = question.substring(0, 500);
   
-  try {
-    // Limit question length to prevent database errors
-    const truncatedQuestion = question.substring(0, 500);
-    
-    await prisma.analytics.upsert({
+  await safeDbOperation(
+    async (p) => await p.analytics.upsert({
       where: {
         question: truncatedQuestion,
       },
@@ -230,11 +229,8 @@ export async function logAnalytics(question: string): Promise<void> {
         count: 1,
         lastAsked: new Date(),
       },
-    }).catch(() => {
-      // Silently fail - analytics is completely optional
-    });
-  } catch (error) {
-    // Silently fail - analytics is completely optional
-  }
+    }),
+    undefined
+  );
 }
 
