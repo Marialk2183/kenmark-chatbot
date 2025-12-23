@@ -50,11 +50,33 @@ export async function POST(request: NextRequest) {
     }));
 
     // Generate AI response using RAG
-    const aiResponse = await generateAIResponse(
-      message,
-      contextText,
-      conversationHistory
-    );
+    let aiResponse: string;
+    try {
+      aiResponse = await generateAIResponse(
+        message,
+        contextText,
+        conversationHistory
+      );
+      
+      // Ensure we always have a valid response
+      if (!aiResponse || aiResponse.trim().length === 0) {
+        // Use knowledge base as fallback
+        if (knowledgeResults.length > 0) {
+          const firstResult = knowledgeResults[0];
+          aiResponse = firstResult.answer || "Thank you for your question! Please visit kenmarkitan.com for more information.";
+        } else {
+          aiResponse = "Thank you for your question about Kenmark ITan Solutions! I can help you with information about our services, company details, and FAQs. Please visit kenmarkitan.com for more details or contact us directly.";
+        }
+      }
+    } catch (aiError: any) {
+      console.error("AI generation error:", aiError);
+      // Use knowledge base as fallback
+      if (knowledgeResults.length > 0) {
+        aiResponse = knowledgeResults[0].answer || "Thank you for your question! Please visit kenmarkitan.com for more information.";
+      } else {
+        aiResponse = "Thank you for your question about Kenmark ITan Solutions! I can help you with information about our services, company details, and FAQs. Please visit kenmarkitan.com for more details or contact us directly.";
+      }
+    }
 
     // Save to database
     try {
@@ -100,14 +122,14 @@ export async function POST(request: NextRequest) {
       stack: error.stack,
       code: error.code,
     });
-    return NextResponse.json(
-      {
-        error: "Internal server error",
-        message: process.env.NODE_ENV === "development" ? error.message : "An error occurred",
-        details: process.env.NODE_ENV === "development" ? error.stack : undefined,
-      },
-      { status: 500 }
-    );
+    
+    // Always return a valid response, never an error
+    const fallbackResponse = "Thank you for your question about Kenmark ITan Solutions! I can help you with information about our services, company details, and FAQs. Please visit kenmarkitan.com for more details or contact us directly.";
+    
+    return NextResponse.json({
+      response: fallbackResponse,
+      context: "General assistance",
+    });
   }
 }
 

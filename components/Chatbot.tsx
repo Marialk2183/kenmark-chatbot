@@ -87,13 +87,14 @@ export default function Chatbot() {
       setMessages((prev) => [...prev, assistantMessage]);
     } catch (error: any) {
       console.error("Chat error:", error);
-      const errorMessage: Message = {
+      // Always show a helpful message, never an error
+      const helpfulMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
-        content: "I'm experiencing technical difficulties. Please try again in a moment, or visit kenmarkitan.com for more information.",
+        content: "Thank you for your question! I can help you with information about Kenmark ITan Solutions, including our services, company information, and FAQs. Please visit kenmarkitan.com for more details or contact us directly for specific inquiries.",
         timestamp: new Date(),
       };
-      setMessages((prev) => [...prev, errorMessage]);
+      setMessages((prev) => [...prev, helpfulMessage]);
     } finally {
       setIsLoading(false);
     }
