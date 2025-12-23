@@ -111,8 +111,16 @@ export async function POST(request: NextRequest) {
       // Continue even if DB fails
     }
 
+    // Ensure response is never empty or an error message
+    const finalResponse = aiResponse && aiResponse.trim().length > 0 && 
+                          !aiResponse.includes("I apologize, but I couldn't generate a response")
+      ? aiResponse
+      : (knowledgeResults.length > 0 
+          ? knowledgeResults[0].answer 
+          : "Thank you for your question about Kenmark ITan Solutions! I can help you with information about our services, company details, and FAQs. Please visit kenmarkitan.com for more details or contact us directly.");
+
     return NextResponse.json({
-      response: aiResponse,
+      response: finalResponse,
       context: knowledgeResults.length > 0 ? "Found relevant information" : "No specific information found",
     });
   } catch (error: any) {
