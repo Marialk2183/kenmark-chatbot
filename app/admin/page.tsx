@@ -55,9 +55,24 @@ export default function AdminPage() {
     try {
       const response = await fetch("/api/admin/analytics");
       const data = await response.json();
-      setAnalytics(data);
+      
+      if (response.ok && !data.error) {
+        setAnalytics(data);
+      } else {
+        console.error("Analytics API error:", data);
+        setAnalytics({
+          topQuestions: [],
+          totalQuestions: 0,
+          totalKnowledgeEntries: 0,
+        });
+      }
     } catch (error) {
       console.error("Failed to load analytics:", error);
+      setAnalytics({
+        topQuestions: [],
+        totalQuestions: 0,
+        totalKnowledgeEntries: 0,
+      });
     }
   };
 
@@ -341,7 +356,7 @@ export default function AdminPage() {
                       Total Questions Asked
                     </p>
                     <p className="text-3xl font-bold text-primary-600 dark:text-primary-400">
-                      {analytics.totalQuestions}
+                      {analytics.totalQuestions || 0}
                     </p>
                   </div>
                   <div className="p-6 bg-green-50 dark:bg-green-900/20 rounded-lg">
@@ -349,7 +364,7 @@ export default function AdminPage() {
                       Knowledge Entries
                     </p>
                     <p className="text-3xl font-bold text-green-600 dark:text-green-400">
-                      {analytics.totalKnowledgeEntries}
+                      {analytics.totalKnowledgeEntries || 0}
                     </p>
                   </div>
                   <div className="p-6 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
@@ -357,7 +372,7 @@ export default function AdminPage() {
                       Unique Questions
                     </p>
                     <p className="text-3xl font-bold text-purple-600 dark:text-purple-400">
-                      {analytics.topQuestions.length}
+                      {analytics.topQuestions?.length || 0}
                     </p>
                   </div>
                 </div>
