@@ -77,10 +77,24 @@ export default function Chatbot() {
 
       const data = await response.json();
 
+      // Always ensure we have a valid response
+      let responseText = data.response;
+      
+      if (!responseText || responseText.trim().length === 0) {
+        // Fallback response
+        responseText = "Thank you for your question! I can help you with information about Kenmark ITan Solutions, including our services, company information, and FAQs. Please visit kenmarkitan.com for more details or contact us directly.";
+      }
+      
+      // Remove any error messages
+      if (responseText.includes("I apologize, but I couldn't generate a response") || 
+          responseText.includes("I apologize, but I couldn't")) {
+        responseText = "Thank you for your question! I can help you with information about Kenmark ITan Solutions. Please visit kenmarkitan.com for more details or contact us directly.";
+      }
+
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
-        content: data.response || data.error || "I apologize, but I couldn't generate a response. Please try again.",
+        content: responseText,
         timestamp: new Date(),
       };
 
