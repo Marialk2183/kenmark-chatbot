@@ -4,14 +4,29 @@ import { searchKnowledgeBase, logAnalytics } from "@/lib/knowledge";
 import { prisma } from "@/lib/prisma";
 
 export async function POST(request: NextRequest) {
+  // Default fallback response
+  const defaultResponse = "Thank you for your question about Kenmark ITan Solutions! I can help you with information about our services, company details, and FAQs. Please visit kenmarkitan.com for more details or contact us directly.";
+  
   try {
-    const { message, sessionId, history } = await request.json();
+    // Parse request body safely
+    let body;
+    try {
+      body = await request.json();
+    } catch (parseError) {
+      console.error("Request parsing error:", parseError);
+      return NextResponse.json({
+        response: defaultResponse,
+        context: "General assistance",
+      });
+    }
+
+    const { message, sessionId, history } = body || {};
 
     if (!message || typeof message !== "string") {
-      return NextResponse.json(
-        { error: "Message is required" },
-        { status: 400 }
-      );
+      return NextResponse.json({
+        response: defaultResponse,
+        context: "General assistance",
+      });
     }
 
     // Log analytics (non-blocking)
@@ -78,37 +93,41 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Save to database
-    try {
-      // Ensure session exists and get its ID
-      const session = await prisma.chatSession.upsert({
-        where: { sessionId },
-        update: { updatedAt: new Date() },
-        create: { sessionId },
-      });
+    // Save to database (completely non-blocking)
+    if (process.env.DATABASE_URL) {
+      try {
+        // Ensure session exists and get its ID
+        const session = await prisma.chatSession.upsert({
+          where: { sessionId: sessionId || "default" },
+          update: { updatedAt: new Date() },
+          create: { sessionId: sessionId || "default" },
+        }).catch(() => null);
 
-      // Save user message
-      await prisma.chatMessage.create({
-        data: {
-          sessionId,
-          sessionRef: session.id,
-          role: "user",
-          content: message,
-        },
-      });
+        if (session) {
+          // Save user message
+          await prisma.chatMessage.create({
+            data: {
+              sessionId: sessionId || "default",
+              sessionRef: session.id,
+              role: "user",
+              content: message.substring(0, 5000), // Limit length
+            },
+          }).catch(() => {});
 
-      // Save assistant message
-      await prisma.chatMessage.create({
-        data: {
-          sessionId,
-          sessionRef: session.id,
-          role: "assistant",
-          content: aiResponse,
-        },
-      });
-    } catch (dbError) {
-      console.error("Database error (non-critical):", dbError);
-      // Continue even if DB fails
+          // Save assistant message
+          await prisma.chatMessage.create({
+            data: {
+              sessionId: sessionId || "default",
+              sessionRef: session.id,
+              role: "assistant",
+              content: aiResponse.substring(0, 5000), // Limit length
+            },
+          }).catch(() => {});
+        }
+      } catch (dbError) {
+        console.error("Database error (non-critical):", dbError);
+        // Continue even if DB fails - this is completely optional
+      }
     }
 
     // Ensure response is never empty or an error message
@@ -126,16 +145,14 @@ export async function POST(request: NextRequest) {
   } catch (error: any) {
     console.error("Chat API error:", error);
     console.error("Error details:", {
-      message: error.message,
-      stack: error.stack,
-      code: error.code,
+      message: error?.message,
+      stack: error?.stack,
+      code: error?.code,
     });
     
-    // Always return a valid response, never an error
-    const fallbackResponse = "Thank you for your question about Kenmark ITan Solutions! I can help you with information about our services, company details, and FAQs. Please visit kenmarkitan.com for more details or contact us directly.";
-    
+    // Always return a valid response with 200 status, never an error
     return NextResponse.json({
-      response: fallbackResponse,
+      response: defaultResponse,
       context: "General assistance",
     });
   }

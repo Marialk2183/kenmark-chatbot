@@ -10,6 +10,11 @@ export interface KnowledgeEntry {
 }
 
 export async function searchKnowledgeBase(query: string, limit: number = 5): Promise<KnowledgeEntry[]> {
+  // Return empty if no database connection
+  if (!process.env.DATABASE_URL) {
+    return [];
+  }
+  
   try {
     if (!query || typeof query !== "string" || query.trim().length === 0) {
       return [];
@@ -198,6 +203,11 @@ export async function saveKnowledgeEntries(entries: KnowledgeEntry[]): Promise<v
 }
 
 export async function logAnalytics(question: string): Promise<void> {
+  // Only log if database is available
+  if (!process.env.DATABASE_URL) {
+    return;
+  }
+  
   try {
     // Limit question length to prevent database errors
     const truncatedQuestion = question.substring(0, 500);
@@ -217,10 +227,11 @@ export async function logAnalytics(question: string): Promise<void> {
         count: 1,
         lastAsked: new Date(),
       },
+    }).catch(() => {
+      // Silently fail - analytics is completely optional
     });
   } catch (error) {
-    console.error("Analytics logging error (non-critical):", error);
-    // Don't throw - analytics is non-critical
+    // Silently fail - analytics is completely optional
   }
 }
 
