@@ -2,6 +2,7 @@ import { prisma } from "./prisma";
 import * as XLSX from "xlsx";
 
 export interface KnowledgeEntry {
+  id?: string;
   category: string;
   question?: string;
   answer: string;
@@ -58,6 +59,7 @@ export async function getAllKnowledge(): Promise<KnowledgeEntry[]> {
   });
 
   return results.map((entry) => ({
+    id: entry.id.toString(),
     category: entry.category,
     question: entry.question || undefined,
     answer: entry.answer,

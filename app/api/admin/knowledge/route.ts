@@ -30,8 +30,16 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
+    const idNumber = parseInt(id, 10);
+    if (isNaN(idNumber)) {
+      return NextResponse.json(
+        { error: "Invalid ID format" },
+        { status: 400 }
+      );
+    }
+
     await prisma.knowledgeBase.delete({
-      where: { id },
+      where: { id: idNumber },
     });
 
     return NextResponse.json({ success: true });
