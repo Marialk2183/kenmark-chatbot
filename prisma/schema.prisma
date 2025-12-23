@@ -6,13 +6,13 @@ generator client {
 }
 
 datasource db {
-  provider = "mysql"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
 model ChatSession {
   id        Int      @id @default(autoincrement())
-  sessionId String   @unique @db.VarChar(255)
+  sessionId String   @unique
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   messages  ChatMessage[]
@@ -22,9 +22,9 @@ model ChatSession {
 
 model ChatMessage {
   id         Int          @id @default(autoincrement())
-  sessionId  String       @db.VarChar(255)
+  sessionId  String
   sessionRef Int
-  role       String       @db.VarChar(50) // "user" or "assistant"
+  role       String       // "user" or "assistant"
   content    String       @db.Text
   createdAt  DateTime     @default(now())
   session    ChatSession  @relation(fields: [sessionRef], references: [id], onDelete: Cascade)
@@ -35,22 +35,22 @@ model ChatMessage {
 
 model KnowledgeBase {
   id        Int      @id @default(autoincrement())
-  category  String   @db.VarChar(100) // "About", "Services", "FAQ", "Contact", etc.
+  category  String   // "About", "Services", "FAQ", "Contact", etc.
   question  String?  @db.Text
   answer    String   @db.Text
-  source    String   @db.VarChar(50) // "excel" or "website"
+  source    String   // "excel" or "website"
   metadata  Json?    // Additional metadata as JSON
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([category])
-  @@index([question(length: 100)])
-  @@index([category, question(length: 100)])
+  @@index([question])
+  @@index([category, question])
 }
 
 model Analytics {
   id          Int      @id @default(autoincrement())
-  question    String   @db.VarChar(500)
+  question    String   @db.Text
   count       Int      @default(1)
   lastAsked   DateTime @default(now())
   createdAt   DateTime @default(now())
