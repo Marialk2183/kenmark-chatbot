@@ -11,11 +11,6 @@ export interface KnowledgeEntry {
 }
 
 export async function searchKnowledgeBase(query: string, limit: number = 5): Promise<KnowledgeEntry[]> {
-  // Return empty if no database connection
-  if (!process.env.DATABASE_URL) {
-    return [];
-  }
-  
   try {
     if (!query || typeof query !== "string" || query.trim().length === 0) {
       return [];
@@ -45,31 +40,34 @@ export async function searchKnowledgeBase(query: string, limit: number = 5): Pro
     }
 
     // Search in question and answer fields
-    const results = await prisma.knowledgeBase.findMany({
-      where: {
-        OR: [
-          {
-            question: {
-              contains: query,
-              mode: "insensitive",
+    const results = await safeDbOperation(
+      async (p) => await p.knowledgeBase.findMany({
+        where: {
+          OR: [
+            {
+              question: {
+                contains: query,
+                mode: "insensitive",
+              },
             },
-          },
-          {
-            answer: {
-              contains: query,
-              mode: "insensitive",
+            {
+              answer: {
+                contains: query,
+                mode: "insensitive",
+              },
             },
-          },
-          {
-            category: {
-              contains: query,
-              mode: "insensitive",
+            {
+              category: {
+                contains: query,
+                mode: "insensitive",
+              },
             },
-          },
-        ],
-      },
-      take: limit,
-    });
+          ],
+        },
+        take: limit,
+      }),
+      []
+    );
 
     return results.map((entry) => ({
       id: entry.id.toString(),
@@ -164,11 +162,11 @@ export async function parseExcelFile(fileBuffer: Buffer): Promise<KnowledgeEntry
 }
 
 export async function saveKnowledgeEntries(entries: KnowledgeEntry[]): Promise<void> {
-  try {
-    for (const entry of entries) {
-      try {
+  for (const entry of entries) {
+    await safeDbOperation(
+      async (p) => {
         // Check if entry exists
-        const existing = await prisma.knowledgeBase.findFirst({
+        const existing = await p.knowledgeBase.findFirst({
           where: {
             category: entry.category,
             question: entry.question || null,
@@ -178,7 +176,7 @@ export async function saveKnowledgeEntries(entries: KnowledgeEntry[]): Promise<v
 
         if (existing) {
           // Update existing entry
-          await prisma.knowledgeBase.update({
+          await p.knowledgeBase.update({
             where: { id: existing.id },
             data: {
               category: entry.category,
@@ -189,7 +187,7 @@ export async function saveKnowledgeEntries(entries: KnowledgeEntry[]): Promise<v
           });
         } else {
           // Create new entry
-          await prisma.knowledgeBase.create({
+          await p.knowledgeBase.create({
             data: {
               category: entry.category,
               question: entry.question || null,
@@ -198,14 +196,9 @@ export async function saveKnowledgeEntries(entries: KnowledgeEntry[]): Promise<v
             },
           });
         }
-      } catch (entryError: any) {
-        console.error(`Error saving entry: ${entry.category}`, entryError);
-        // Continue with next entry even if one fails
-      }
-    }
-  } catch (error: any) {
-    console.error("Error in saveKnowledgeEntries:", error);
-    throw new Error(`Failed to save knowledge entries: ${error.message}`);
+      },
+      undefined
+    );
   }
 }
 
