@@ -6,47 +6,51 @@ generator client {
 }
 
 datasource db {
-  provider = "mongodb"
+  provider = "mysql"
   url      = env("DATABASE_URL")
 }
 
 model ChatSession {
-  id        String   @id @default(auto()) @map("_id") @db.ObjectId
-  sessionId String   @unique
+  id        Int      @id @default(autoincrement())
+  sessionId String   @unique @db.VarChar(255)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   messages  ChatMessage[]
-}
-
-model ChatMessage {
-  id        String   @id @default(auto()) @map("_id") @db.ObjectId
-  sessionId String
-  role      String   // "user" or "assistant"
-  content   String
-  createdAt DateTime @default(now())
-  session   ChatSession @relation(fields: [sessionId], references: [sessionId], onDelete: Cascade)
 
   @@index([sessionId])
 }
 
+model ChatMessage {
+  id         Int          @id @default(autoincrement())
+  sessionId  String       @db.VarChar(255)
+  sessionRef Int
+  role       String       @db.VarChar(50) // "user" or "assistant"
+  content    String       @db.Text
+  createdAt  DateTime     @default(now())
+  session    ChatSession  @relation(fields: [sessionRef], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+  @@index([sessionRef])
+}
+
 model KnowledgeBase {
-  id        String   @id @default(auto()) @map("_id") @db.ObjectId
-  category  String   // "About", "Services", "FAQ", "Contact", etc.
-  question  String?
-  answer    String
-  source    String   // "excel" or "website"
-  metadata  String?  @db.Json // Additional metadata as JSON
+  id        Int      @id @default(autoincrement())
+  category  String   @db.VarChar(100) // "About", "Services", "FAQ", "Contact", etc.
+  question  String?  @db.Text
+  answer    String   @db.Text
+  source    String   @db.VarChar(50) // "excel" or "website"
+  metadata  Json?    // Additional metadata as JSON
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([category])
-  @@index([question])
-  @@index([category, question])
+  @@index([question(length: 100)])
+  @@index([category, question(length: 100)])
 }
 
 model Analytics {
-  id          String   @id @default(auto()) @map("_id") @db.ObjectId
-  question    String
+  id          Int      @id @default(autoincrement())
+  question    String   @db.VarChar(500)
   count       Int      @default(1)
   lastAsked   DateTime @default(now())
   createdAt   DateTime @default(now())

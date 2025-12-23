@@ -48,8 +48,8 @@ export async function POST(request: NextRequest) {
 
     // Save to database
     try {
-      // Ensure session exists
-      await prisma.chatSession.upsert({
+      // Ensure session exists and get its ID
+      const session = await prisma.chatSession.upsert({
         where: { sessionId },
         update: { updatedAt: new Date() },
         create: { sessionId },
@@ -59,6 +59,7 @@ export async function POST(request: NextRequest) {
       await prisma.chatMessage.create({
         data: {
           sessionId,
+          sessionRef: session.id,
           role: "user",
           content: message,
         },
@@ -68,6 +69,7 @@ export async function POST(request: NextRequest) {
       await prisma.chatMessage.create({
         data: {
           sessionId,
+          sessionRef: session.id,
           role: "assistant",
           content: aiResponse,
         },

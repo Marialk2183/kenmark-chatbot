@@ -91,7 +91,26 @@ async function tryAlternativeAI(
     }
   }
 
-  // Fallback response
-  return `Based on the available information: ${context.substring(0, 200)}... For more details, please visit kenmarkitan.com or contact us directly.`;
+  // Fallback response - provide intelligent response from knowledge base
+  if (context && context.length > 50 && !context.includes("No specific information found")) {
+    // Extract relevant answer from context
+    const contextLines = context.split('\n\n');
+    const relevantAnswer = contextLines.find(line => 
+      line.includes('A:') || line.includes('Answer:') || line.toLowerCase().includes(userQuery.toLowerCase())
+    );
+    
+    if (relevantAnswer) {
+      const answer = relevantAnswer.split('A:')[1] || relevantAnswer.split('Answer:')[1] || relevantAnswer;
+      return answer.trim() + "\n\nFor more information, please visit kenmarkitan.com or contact us directly.";
+    }
+    
+    // Return first meaningful answer from context
+    const firstAnswer = contextLines.find(line => line.length > 20);
+    if (firstAnswer) {
+      return firstAnswer.split('A:')[1]?.trim() || firstAnswer + "\n\nFor more details, please visit kenmarkitan.com.";
+    }
+  }
+  
+  return `I don't have that specific information yet. Based on our knowledge base, I can help you with questions about our services, company information, and FAQs. Please visit kenmarkitan.com for more details or contact us directly.`;
 }
 
