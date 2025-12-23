@@ -22,8 +22,14 @@ ${context}
 
 User query: ${userQuery}`;
 
+  // Skip Ollama in production (it won't be available)
+  if (process.env.NODE_ENV === "production" || !OLLAMA_API_URL.includes("localhost")) {
+    console.log("Skipping Ollama, using alternative AI or fallback");
+    return await tryAlternativeAI(userQuery, context, conversationHistory);
+  }
+
   try {
-    // Try Ollama first (local LLM)
+    // Try Ollama first (local LLM) - only in development
     const response = await axios.post(
       `${OLLAMA_API_URL}/api/chat`,
       {
@@ -36,21 +42,20 @@ User query: ${userQuery}`;
         stream: false,
       },
       {
-        timeout: 30000, // 30 second timeout
+        timeout: 5000, // Short timeout for faster fallback
       }
     );
 
-    return response.data.message?.content || "I apologize, but I couldn't generate a response. Please try again.";
-  } catch (error: any) {
-    // Fallback to alternative AI APIs if Ollama is not available
-    if (error.code === "ECONNREFUSED" || error.response?.status === 404) {
-      console.warn("Ollama not available, trying alternative APIs...");
-      return await tryAlternativeAI(userQuery, context, conversationHistory);
+    const content = response.data.message?.content;
+    if (content && content.trim().length > 0) {
+      return content;
     }
-    
-    console.error("AI generation error:", error);
-    return "I apologize, but I'm experiencing technical difficulties. Please try again later.";
+  } catch (error: any) {
+    console.warn("Ollama not available, using alternative AI or fallback");
   }
+  
+  // Always fallback to alternative AI or knowledge base
+  return await tryAlternativeAI(userQuery, context, conversationHistory);
 }
 
 async function tryAlternativeAI(
@@ -102,43 +107,69 @@ async function tryAlternativeAI(
 
   // Fallback response - provide intelligent response from knowledge base
   console.log("Using fallback response from knowledge base");
+  console.log("Context length:", context?.length || 0);
   
-  if (context && context.length > 50 && !context.includes("No specific information found")) {
+  if (context && context.length > 20 && !context.includes("No specific information found")) {
     // Extract relevant answer from context
-    const contextLines = context.split('\n\n');
+    const contextLines = context.split('\n\n').filter(line => line.trim().length > 0);
     
     // Try to find answer with "A:" or "Answer:"
     for (const line of contextLines) {
       if (line.includes('A:') || line.includes('Answer:')) {
-        const answer = line.split('A:')[1]?.trim() || line.split('Answer:')[1]?.trim() || line;
-        if (answer.length > 10) {
+        const parts = line.split('A:');
+        const answer = parts.length > 1 ? parts[1].trim() : line.split('Answer:')[1]?.trim() || line;
+        if (answer && answer.length > 10) {
           return answer + "\n\nFor more information, please visit kenmarkitan.com or contact us directly.";
         }
       }
     }
     
-    // Try to find line that matches the query
-    const matchingLine = contextLines.find(line => 
-      line.toLowerCase().includes(userQuery.toLowerCase().split(' ')[0])
-    );
-    if (matchingLine && matchingLine.length > 20) {
-      return matchingLine + "\n\nFor more details, please visit kenmarkitan.com.";
+    // Try to find line that matches the query keywords
+    const queryWords = userQuery.toLowerCase().split(/\s+/).filter(w => w.length > 3);
+    for (const word of queryWords) {
+      const matchingLine = contextLines.find(line => 
+        line.toLowerCase().includes(word)
+      );
+      if (matchingLine && matchingLine.length > 20) {
+        // Extract the answer part
+        const answerPart = matchingLine.includes(':') 
+          ? matchingLine.split(':').slice(-1)[0].trim()
+          : matchingLine;
+        if (answerPart.length > 10) {
+          return answerPart + "\n\nFor more details, please visit kenmarkitan.com.";
+        }
+      }
     }
     
     // Return first meaningful answer from context
-    const firstAnswer = contextLines.find(line => line.length > 20 && (line.includes(':') || line.includes('?')));
-    if (firstAnswer) {
-      const cleanAnswer = firstAnswer.split(':').slice(-1)[0]?.trim() || firstAnswer;
-      return cleanAnswer + "\n\nFor more details, please visit kenmarkitan.com.";
+    for (const line of contextLines) {
+      if (line.length > 30) {
+        // Extract answer if it has a colon separator
+        const answerPart = line.includes(':') 
+          ? line.split(':').slice(-1)[0].trim()
+          : line.trim();
+        if (answerPart.length > 20) {
+          return answerPart + "\n\nFor more details, please visit kenmarkitan.com.";
+        }
+      }
     }
     
-    // Return context as-is if it's meaningful
-    if (context.length > 50) {
-      return context.substring(0, 300) + "...\n\nFor more information, please visit kenmarkitan.com.";
+    // Return first substantial line from context
+    const firstSubstantial = contextLines.find(line => line.length > 50);
+    if (firstSubstantial) {
+      return firstSubstantial.substring(0, 400) + (firstSubstantial.length > 400 ? "..." : "") + "\n\nFor more information, please visit kenmarkitan.com.";
     }
   }
   
-  // Default helpful response
-  return `Thank you for your question! I can help you with information about Kenmark ITan Solutions, including our services, company information, and FAQs. Please visit kenmarkitan.com for more details or contact us directly for specific inquiries.`;
+  // Default helpful response - always return something useful
+  return `Thank you for your question about Kenmark ITan Solutions! 
+
+I can help you with information about:
+• Our services and solutions
+• Company information
+• Frequently asked questions
+• Contact information
+
+Please visit kenmarkitan.com for more details, or feel free to ask me a specific question and I'll do my best to help!`;
 }
 
