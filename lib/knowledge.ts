@@ -68,29 +68,52 @@ export async function getAllKnowledge(): Promise<KnowledgeEntry[]> {
 }
 
 export async function parseExcelFile(fileBuffer: Buffer): Promise<KnowledgeEntry[]> {
-  const workbook = XLSX.read(fileBuffer, { type: "buffer" });
-  const sheetName = workbook.SheetNames[0];
-  const worksheet = workbook.Sheets[sheetName];
-  const data = XLSX.utils.sheet_to_json(worksheet) as any[];
-
-  const entries: KnowledgeEntry[] = [];
-
-  for (const row of data) {
-    const category = row.Category || row.category || "General";
-    const question = row.Question || row.question || null;
-    const answer = row.Answer || row.answer || "";
-
-    if (answer) {
-      entries.push({
-        category: String(category),
-        question: question ? String(question) : undefined,
-        answer: String(answer),
-        source: "excel",
-      });
+  try {
+    const workbook = XLSX.read(fileBuffer, { type: "buffer" });
+    
+    if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
+      throw new Error("Excel file has no sheets");
     }
-  }
+    
+    const sheetName = workbook.SheetNames[0];
+    const worksheet = workbook.Sheets[sheetName];
+    
+    if (!worksheet) {
+      throw new Error("Could not read worksheet from Excel file");
+    }
+    
+    const data = XLSX.utils.sheet_to_json(worksheet) as any[];
+    
+    if (!data || data.length === 0) {
+      throw new Error("Excel file is empty or has no data rows");
+    }
 
-  return entries;
+    const entries: KnowledgeEntry[] = [];
+
+    for (const row of data) {
+      const category = row.Category || row.category || row["Category"] || row["category"] || "General";
+      const question = row.Question || row.question || row["Question"] || row["question"] || null;
+      const answer = row.Answer || row.answer || row["Answer"] || row["answer"] || "";
+
+      if (answer && String(answer).trim().length > 0) {
+        entries.push({
+          category: String(category).trim(),
+          question: question ? String(question).trim() : undefined,
+          answer: String(answer).trim(),
+          source: "excel",
+        });
+      }
+    }
+
+    if (entries.length === 0) {
+      throw new Error("No valid entries found. Please ensure your Excel file has 'Category' and 'Answer' columns with data.");
+    }
+
+    return entries;
+  } catch (error: any) {
+    console.error("Excel parsing error:", error);
+    throw new Error(`Failed to parse Excel file: ${error.message}`);
+  }
 }
 
 export async function saveKnowledgeEntries(entries: KnowledgeEntry[]): Promise<void> {

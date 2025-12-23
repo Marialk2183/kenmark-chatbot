@@ -115,13 +115,15 @@ export default function AdminPage() {
       } else {
         setUploadMessage({
           type: "error",
-          text: data.error || "Upload failed",
+          text: data.error || data.message || "Upload failed. Please check the file format.",
         });
+        console.error("Upload failed:", data);
       }
-    } catch (error) {
+    } catch (error: any) {
+      console.error("Upload error:", error);
       setUploadMessage({
         type: "error",
-        text: "Failed to upload file. Please try again.",
+        text: `Failed to upload file: ${error.message || "Network error"}. Please try again.`,
       });
     } finally {
       setUploading(false);

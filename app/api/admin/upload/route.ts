@@ -50,10 +50,12 @@ export async function POST(request: NextRequest) {
     });
   } catch (error: any) {
     console.error("Upload error:", error);
+    console.error("Error stack:", error.stack);
     return NextResponse.json(
       {
         error: "Failed to process file",
-        message: error.message,
+        message: process.env.NODE_ENV === "development" ? error.message : "An error occurred while processing the file. Please check the file format and try again.",
+        details: process.env.NODE_ENV === "development" ? error.stack : undefined,
       },
       { status: 500 }
     );
