@@ -91,17 +91,28 @@ export async function parseExcelFile(fileBuffer: Buffer): Promise<KnowledgeEntry
     const entries: KnowledgeEntry[] = [];
 
     for (const row of data) {
-      const category = row.Category || row.category || row["Category"] || row["category"] || "General";
-      const question = row.Question || row.question || row["Question"] || row["question"] || null;
-      const answer = row.Answer || row.answer || row["Answer"] || row["answer"] || "";
+      try {
+        // Try multiple column name variations (case-insensitive)
+        const category = row.Category || row.category || row["Category"] || row["category"] || 
+                        row.CATEGORY || row["CATEGORY"] || "General";
+        const question = row.Question || row.question || row["Question"] || row["question"] || 
+                        row.QUESTION || row["QUESTION"] || null;
+        const answer = row.Answer || row.answer || row["Answer"] || row["answer"] || 
+                      row.ANSWER || row["ANSWER"] || "";
 
-      if (answer && String(answer).trim().length > 0) {
-        entries.push({
-          category: String(category).trim(),
-          question: question ? String(question).trim() : undefined,
-          answer: String(answer).trim(),
-          source: "excel",
-        });
+        // Check if answer exists and is not empty
+        const answerStr = String(answer || "").trim();
+        if (answerStr.length > 0) {
+          entries.push({
+            category: String(category || "General").trim(),
+            question: question ? String(question).trim() : undefined,
+            answer: answerStr,
+            source: "excel",
+          });
+        }
+      } catch (rowError) {
+        console.error("Error parsing row:", rowError);
+        // Skip this row and continue
       }
     }
 
@@ -117,41 +128,48 @@ export async function parseExcelFile(fileBuffer: Buffer): Promise<KnowledgeEntry
 }
 
 export async function saveKnowledgeEntries(entries: KnowledgeEntry[]): Promise<void> {
-  for (const entry of entries) {
-    // Create a unique identifier for upsert
-    const uniqueKey = `${entry.category}_${entry.question || ""}_${entry.answer.substring(0, 50)}`;
-    
-    // Check if entry exists
-    const existing = await prisma.knowledgeBase.findFirst({
-      where: {
-        category: entry.category,
-        question: entry.question || null,
-        answer: entry.answer,
-      },
-    });
+  try {
+    for (const entry of entries) {
+      try {
+        // Check if entry exists
+        const existing = await prisma.knowledgeBase.findFirst({
+          where: {
+            category: entry.category,
+            question: entry.question || null,
+            answer: entry.answer,
+          },
+        });
 
-    if (existing) {
-      // Update existing entry
-      await prisma.knowledgeBase.update({
-        where: { id: existing.id },
-        data: {
-          category: entry.category,
-          question: entry.question || null,
-          answer: entry.answer,
-          source: entry.source,
-        },
-      });
-    } else {
-      // Create new entry
-      await prisma.knowledgeBase.create({
-        data: {
-          category: entry.category,
-          question: entry.question || null,
-          answer: entry.answer,
-          source: entry.source,
-        },
-      });
+        if (existing) {
+          // Update existing entry
+          await prisma.knowledgeBase.update({
+            where: { id: existing.id },
+            data: {
+              category: entry.category,
+              question: entry.question || null,
+              answer: entry.answer,
+              source: entry.source,
+            },
+          });
+        } else {
+          // Create new entry
+          await prisma.knowledgeBase.create({
+            data: {
+              category: entry.category,
+              question: entry.question || null,
+              answer: entry.answer,
+              source: entry.source,
+            },
+          });
+        }
+      } catch (entryError: any) {
+        console.error(`Error saving entry: ${entry.category}`, entryError);
+        // Continue with next entry even if one fails
+      }
     }
+  } catch (error: any) {
+    console.error("Error in saveKnowledgeEntries:", error);
+    throw new Error(`Failed to save knowledge entries: ${error.message}`);
   }
 }
 
