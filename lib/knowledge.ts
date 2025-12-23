@@ -10,45 +10,69 @@ export interface KnowledgeEntry {
 }
 
 export async function searchKnowledgeBase(query: string, limit: number = 5): Promise<KnowledgeEntry[]> {
-  const searchTerms = query.toLowerCase().split(/\s+/).filter(term => term.length > 2);
-  
-  if (searchTerms.length === 0) {
+  try {
+    if (!query || typeof query !== "string" || query.trim().length === 0) {
+      return [];
+    }
+
+    const searchTerms = query.toLowerCase().split(/\s+/).filter(term => term.length > 2);
+    
+    if (searchTerms.length === 0) {
+      // If no search terms, return some general entries
+      const generalResults = await prisma.knowledgeBase.findMany({
+        take: limit,
+        orderBy: {
+          createdAt: "desc",
+        },
+      });
+      
+      return generalResults.map((entry) => ({
+        id: entry.id.toString(),
+        category: entry.category,
+        question: entry.question || undefined,
+        answer: entry.answer,
+        source: entry.source,
+      }));
+    }
+
+    // Search in question and answer fields
+    const results = await prisma.knowledgeBase.findMany({
+      where: {
+        OR: [
+          {
+            question: {
+              contains: query,
+              mode: "insensitive",
+            },
+          },
+          {
+            answer: {
+              contains: query,
+              mode: "insensitive",
+            },
+          },
+          {
+            category: {
+              contains: query,
+              mode: "insensitive",
+            },
+          },
+        ],
+      },
+      take: limit,
+    });
+
+    return results.map((entry) => ({
+      id: entry.id.toString(),
+      category: entry.category,
+      question: entry.question || undefined,
+      answer: entry.answer,
+      source: entry.source,
+    }));
+  } catch (error) {
+    console.error("Knowledge base search error:", error);
     return [];
   }
-
-  // Search in question and answer fields
-  const results = await prisma.knowledgeBase.findMany({
-    where: {
-      OR: [
-        {
-          question: {
-            contains: query,
-            mode: "insensitive",
-          },
-        },
-        {
-          answer: {
-            contains: query,
-            mode: "insensitive",
-          },
-        },
-        {
-          category: {
-            contains: query,
-            mode: "insensitive",
-          },
-        },
-      ],
-    },
-    take: limit,
-  });
-
-  return results.map((entry) => ({
-    category: entry.category,
-    question: entry.question || undefined,
-    answer: entry.answer,
-    source: entry.source,
-  }));
 }
 
 export async function getAllKnowledge(): Promise<KnowledgeEntry[]> {
