@@ -29,6 +29,9 @@ export async function searchKnowledgeBase(query: string, limit: number = 5): Pro
         orderBy: {
           createdAt: "desc",
         },
+      }).catch(() => {
+        // Return empty array if database query fails
+        return [];
       });
       
       return generalResults.map((entry) => ({
