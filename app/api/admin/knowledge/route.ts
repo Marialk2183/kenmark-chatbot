@@ -1,16 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAllKnowledge } from "@/lib/knowledge";
-import { prisma } from "@/lib/prisma";
+import { safeDbOperation } from "@/lib/safe-prisma";
 
 export async function GET() {
-  try {
-    const knowledge = await getAllKnowledge();
-    return NextResponse.json({ knowledge: knowledge || [] });
-  } catch (error: any) {
-    console.error("Knowledge fetch error:", error);
-    // Return empty array instead of error to prevent UI crashes
-    return NextResponse.json({ knowledge: [] });
-  }
+  const knowledge = await getAllKnowledge();
+  return NextResponse.json({ knowledge: knowledge || [] });
 }
 
 export async function DELETE(request: NextRequest) {
@@ -33,9 +27,22 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    await prisma.knowledgeBase.delete({
-      where: { id: idNumber },
-    });
+    const deleted = await safeDbOperation(
+      async (p) => {
+        await p.knowledgeBase.delete({
+          where: { id: idNumber },
+        });
+        return true;
+      },
+      false
+    );
+
+    if (!deleted) {
+      return NextResponse.json(
+        { error: "Failed to delete entry. Database may be unavailable." },
+        { status: 500 }
+      );
+    }
 
     return NextResponse.json({ success: true });
   } catch (error: any) {

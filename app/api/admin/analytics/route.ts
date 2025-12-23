@@ -1,36 +1,35 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { safeDbOperation } from "@/lib/safe-prisma";
 
 export async function GET() {
-  try {
-    const topQuestions = await prisma.analytics.findMany({
+  const topQuestions = await safeDbOperation(
+    async (p) => await p.analytics.findMany({
       orderBy: {
         count: "desc",
       },
       take: 10,
-    });
+    }),
+    []
+  );
 
-    const totalQuestions = await prisma.analytics.aggregate({
+  const totalQuestions = await safeDbOperation(
+    async (p) => await p.analytics.aggregate({
       _sum: {
         count: true,
       },
-    });
+    }),
+    { _sum: { count: 0 } }
+  );
 
-    const totalKnowledgeEntries = await prisma.knowledgeBase.count();
+  const totalKnowledgeEntries = await safeDbOperation(
+    async (p) => await p.knowledgeBase.count(),
+    0
+  );
 
-    return NextResponse.json({
-      topQuestions: topQuestions || [],
-      totalQuestions: totalQuestions._sum.count || 0,
-      totalKnowledgeEntries: totalKnowledgeEntries || 0,
-    });
-  } catch (error: any) {
-    console.error("Analytics error:", error);
-    // Return empty data instead of error to prevent UI crashes
-    return NextResponse.json({
-      topQuestions: [],
-      totalQuestions: 0,
-      totalKnowledgeEntries: 0,
-    });
-  }
+  return NextResponse.json({
+    topQuestions: topQuestions || [],
+    totalQuestions: totalQuestions._sum?.count || 0,
+    totalKnowledgeEntries: totalKnowledgeEntries || 0,
+  });
 }
 
