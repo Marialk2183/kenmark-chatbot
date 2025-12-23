@@ -61,6 +61,7 @@ async function tryAlternativeAI(
   // Try Groq API (free tier available)
   if (process.env.GROQ_API_KEY) {
     try {
+      console.log("Attempting Groq API call...");
       const response = await axios.post(
         "https://api.groq.com/openai/v1/chat/completions",
         {
@@ -85,32 +86,59 @@ async function tryAlternativeAI(
         }
       );
 
-      return response.data.choices[0]?.message?.content || "I couldn't generate a response.";
-    } catch (error) {
-      console.error("Groq API error:", error);
+      const content = response.data.choices?.[0]?.message?.content;
+      if (content) {
+        console.log("Groq API success");
+        return content;
+      }
+      console.warn("Groq API returned empty response");
+    } catch (error: any) {
+      console.error("Groq API error:", error.response?.data || error.message);
+      // Continue to fallback
     }
+  } else {
+    console.warn("GROQ_API_KEY not set, using fallback");
   }
 
   // Fallback response - provide intelligent response from knowledge base
+  console.log("Using fallback response from knowledge base");
+  
   if (context && context.length > 50 && !context.includes("No specific information found")) {
     // Extract relevant answer from context
     const contextLines = context.split('\n\n');
-    const relevantAnswer = contextLines.find(line => 
-      line.includes('A:') || line.includes('Answer:') || line.toLowerCase().includes(userQuery.toLowerCase())
-    );
     
-    if (relevantAnswer) {
-      const answer = relevantAnswer.split('A:')[1] || relevantAnswer.split('Answer:')[1] || relevantAnswer;
-      return answer.trim() + "\n\nFor more information, please visit kenmarkitan.com or contact us directly.";
+    // Try to find answer with "A:" or "Answer:"
+    for (const line of contextLines) {
+      if (line.includes('A:') || line.includes('Answer:')) {
+        const answer = line.split('A:')[1]?.trim() || line.split('Answer:')[1]?.trim() || line;
+        if (answer.length > 10) {
+          return answer + "\n\nFor more information, please visit kenmarkitan.com or contact us directly.";
+        }
+      }
+    }
+    
+    // Try to find line that matches the query
+    const matchingLine = contextLines.find(line => 
+      line.toLowerCase().includes(userQuery.toLowerCase().split(' ')[0])
+    );
+    if (matchingLine && matchingLine.length > 20) {
+      return matchingLine + "\n\nFor more details, please visit kenmarkitan.com.";
     }
     
     // Return first meaningful answer from context
-    const firstAnswer = contextLines.find(line => line.length > 20);
+    const firstAnswer = contextLines.find(line => line.length > 20 && (line.includes(':') || line.includes('?')));
     if (firstAnswer) {
-      return firstAnswer.split('A:')[1]?.trim() || firstAnswer + "\n\nFor more details, please visit kenmarkitan.com.";
+      const cleanAnswer = firstAnswer.split(':').slice(-1)[0]?.trim() || firstAnswer;
+      return cleanAnswer + "\n\nFor more details, please visit kenmarkitan.com.";
+    }
+    
+    // Return context as-is if it's meaningful
+    if (context.length > 50) {
+      return context.substring(0, 300) + "...\n\nFor more information, please visit kenmarkitan.com.";
     }
   }
   
-  return `I don't have that specific information yet. Based on our knowledge base, I can help you with questions about our services, company information, and FAQs. Please visit kenmarkitan.com for more details or contact us directly.`;
+  // Default helpful response
+  return `Thank you for your question! I can help you with information about Kenmark ITan Solutions, including our services, company information, and FAQs. Please visit kenmarkitan.com for more details or contact us directly for specific inquiries.`;
 }
 
