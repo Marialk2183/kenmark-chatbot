@@ -1,0 +1,57 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+model ChatSession {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  sessionId String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  messages  ChatMessage[]
+}
+
+model ChatMessage {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  sessionId String
+  role      String   // "user" or "assistant"
+  content   String
+  createdAt DateTime @default(now())
+  session   ChatSession @relation(fields: [sessionId], references: [sessionId], onDelete: Cascade)
+
+  @@index([sessionId])
+}
+
+model KnowledgeBase {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  category  String   // "About", "Services", "FAQ", "Contact", etc.
+  question  String?
+  answer    String
+  source    String   // "excel" or "website"
+  metadata  String?  @db.Json // Additional metadata as JSON
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([category])
+  @@index([question])
+  @@index([category, question])
+}
+
+model Analytics {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  question    String
+  count       Int      @default(1)
+  lastAsked   DateTime @default(now())
+  createdAt   DateTime @default(now())
+
+  @@unique([question])
+  @@index([count])
+}
+
