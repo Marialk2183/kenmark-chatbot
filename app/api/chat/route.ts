@@ -14,11 +14,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Log analytics
-    await logAnalytics(message);
+    // Log analytics (non-blocking)
+    try {
+      await logAnalytics(message);
+    } catch (analyticsError) {
+      console.error("Analytics logging error (non-critical):", analyticsError);
+    }
 
     // Search knowledge base for relevant context
-    const knowledgeResults = await searchKnowledgeBase(message, 5);
+    let knowledgeResults = [];
+    try {
+      knowledgeResults = await searchKnowledgeBase(message, 5);
+    } catch (kbError) {
+      console.error("Knowledge base search error (non-critical):", kbError);
+      knowledgeResults = [];
+    }
     
     // Build context from knowledge base
     const context = knowledgeResults

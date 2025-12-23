@@ -70,22 +70,27 @@ export default function Chatbot() {
         }),
       });
 
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || `Server error: ${response.status}`);
+      }
+
       const data = await response.json();
 
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
-        content: data.response || "I apologize, but I couldn't generate a response.",
+        content: data.response || data.error || "I apologize, but I couldn't generate a response. Please try again.",
         timestamp: new Date(),
       };
 
       setMessages((prev) => [...prev, assistantMessage]);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Chat error:", error);
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
-        content: "I'm experiencing technical difficulties. Please try again later.",
+        content: "I'm experiencing technical difficulties. Please try again in a moment, or visit kenmarkitan.com for more information.",
         timestamp: new Date(),
       };
       setMessages((prev) => [...prev, errorMessage]);

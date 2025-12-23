@@ -174,21 +174,29 @@ export async function saveKnowledgeEntries(entries: KnowledgeEntry[]): Promise<v
 }
 
 export async function logAnalytics(question: string): Promise<void> {
-  await prisma.analytics.upsert({
-    where: {
-      question: question,
-    },
-    update: {
-      count: {
-        increment: 1,
+  try {
+    // Limit question length to prevent database errors
+    const truncatedQuestion = question.substring(0, 500);
+    
+    await prisma.analytics.upsert({
+      where: {
+        question: truncatedQuestion,
       },
-      lastAsked: new Date(),
-    },
-    create: {
-      question: question,
-      count: 1,
-      lastAsked: new Date(),
-    },
-  });
+      update: {
+        count: {
+          increment: 1,
+        },
+        lastAsked: new Date(),
+      },
+      create: {
+        question: truncatedQuestion,
+        count: 1,
+        lastAsked: new Date(),
+      },
+    });
+  } catch (error) {
+    console.error("Analytics logging error (non-critical):", error);
+    // Don't throw - analytics is non-critical
+  }
 }
 

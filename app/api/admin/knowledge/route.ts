@@ -5,16 +5,11 @@ import { prisma } from "@/lib/prisma";
 export async function GET() {
   try {
     const knowledge = await getAllKnowledge();
-    return NextResponse.json({ knowledge });
+    return NextResponse.json({ knowledge: knowledge || [] });
   } catch (error: any) {
     console.error("Knowledge fetch error:", error);
-    return NextResponse.json(
-      {
-        error: "Failed to fetch knowledge base",
-        message: error.message,
-      },
-      { status: 500 }
-    );
+    // Return empty array instead of error to prevent UI crashes
+    return NextResponse.json({ knowledge: [] });
   }
 }
 

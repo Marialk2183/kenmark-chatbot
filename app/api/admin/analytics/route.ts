@@ -19,19 +19,18 @@ export async function GET() {
     const totalKnowledgeEntries = await prisma.knowledgeBase.count();
 
     return NextResponse.json({
-      topQuestions,
+      topQuestions: topQuestions || [],
       totalQuestions: totalQuestions._sum.count || 0,
-      totalKnowledgeEntries,
+      totalKnowledgeEntries: totalKnowledgeEntries || 0,
     });
   } catch (error: any) {
     console.error("Analytics error:", error);
-    return NextResponse.json(
-      {
-        error: "Failed to fetch analytics",
-        message: error.message,
-      },
-      { status: 500 }
-    );
+    // Return empty data instead of error to prevent UI crashes
+    return NextResponse.json({
+      topQuestions: [],
+      totalQuestions: 0,
+      totalKnowledgeEntries: 0,
+    });
   }
 }
 
