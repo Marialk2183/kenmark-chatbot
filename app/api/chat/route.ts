@@ -85,10 +85,16 @@ export async function POST(request: NextRequest) {
     });
   } catch (error: any) {
     console.error("Chat API error:", error);
+    console.error("Error details:", {
+      message: error.message,
+      stack: error.stack,
+      code: error.code,
+    });
     return NextResponse.json(
       {
         error: "Internal server error",
-        message: error.message,
+        message: process.env.NODE_ENV === "development" ? error.message : "An error occurred",
+        details: process.env.NODE_ENV === "development" ? error.stack : undefined,
       },
       { status: 500 }
     );
